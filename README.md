@@ -2,7 +2,7 @@
 <img src="https://github.com/PureStake/algosigner/raw/develop/media/algosigner-wallet-banner-3.png">
 </p>
 
-# AlgoSigner
+# flutter-algosigner
 [![pub.dev][pub-dev-shield]][pub-dev-url]
 [![Effective Dart][effective-dart-shield]][effective-dart-url]
 [![Stars][stars-shield]][stars-url]
@@ -19,7 +19,7 @@ DApp users can trust AlgoSigner to:
 * Authorize transactions without giving dApps direct access to their keys
 * Sign and approve transactions when using dApps
 
-The **flutter-algosigner** web plugin wraps the JavaScript API and exposes methods for Flutter developers. This way, Flutter web developers can benefit and create web3 dApplications. The plugin was developed by RootSoft and is not affiliated with PureStake or AlgoSigner is any way. For more information, check out the official AlgoSigner [documentation](https://github.com/PureStake/algosigner/blob/develop/docs/dApp-guide.md).
+The plugin was developed by RootSoft and is not affiliated with PureStake or AlgoSigner is any way. For more information, check out the official AlgoSigner [documentation](https://github.com/PureStake/algosigner/blob/develop/docs/dApp-guide.md).
 
 ## Introduction
 
@@ -30,10 +30,19 @@ The flutter-algosigner plugin follows the AlgoSigner API closely and all methods
 Once installed, you can simply sign transactions and start sending payments:
 
 ```dart
-algorand.sendPayment(
-    account: account,
-    recipient: newAccount.address,
-    amount: Algo.toMicroAlgos(5),
+await AlgoSigner.connect();
+
+/// Sign the transaction
+final txs = await AlgoSigner.signTransaction(
+    {
+      'txn': transaction.toBase64(),
+    },
+);
+
+// Send the transaction
+final txId = await AlgoSigner.send(
+    ledger: 'TestNet',
+    transaction: blob,
 );
 ```
 
@@ -56,21 +65,8 @@ dependencies:
 
 Alternatively, your editor might support flutter pub get. Check the docs for your editor to learn more.
 
-## Usage
-Create an ```AlgodClient``` and ```IndexerClient``` and pass them to the ```Algorand``` constructor.
-We added extra support for locally hosted nodes & third party services (like PureStake).
-
-```dart
-await AlgoSigner.connect();
-final txs = await AlgoSigner.signTransaction(
-    {
-      'txn': transaction.toBase64(),
-    },
-);
-```
-
 ## Methods
-Accounts are entities on the Algorand blockchain associated with specific onchain data, like a balance. An Algorand Address is the identifier for an Algorand account.
+The **flutter-algosigner** web plugin wraps the JavaScript API and exposes methods for Flutter developers. This way, Flutter web developers can benefit and create web3 dApplications using the same API.
 
 ### connect()
 
@@ -78,6 +74,120 @@ Requests access to the Wallet for the dApp, may be rejected or approved. Every a
 
 ```dart
 await AlgoSigner.connect();
+```
+
+### accounts()
+
+Returns an array of accounts present in the Wallet for the given Network.
+
+```dart
+final accounts = await AlgoSigner.accounts(ledger: 'TestNet');
+```
+
+### algod()
+
+Proxies the requested path to the Algod v2 API. Is limited to endpoints made available by the API server. By default, all calls to the AlgoSigner.algod method are GET.
+
+```dart
+await AlgoSigner.algod(
+    ledger: 'TestNet',
+    path: '/v2/transactions/params',
+);
+```
+
+To make a POST requests, more details need to be included in as input.
+
+```dart
+await AlgoSigner.algod(
+    ledger: 'TestNet',
+    path: '/v2/teal/compile',
+    body: 'int 0',
+    method: 'POST',
+    contentType: 'text/plain',
+);
+```
+
+### indexer()
+
+Proxies the requested path to the Indexer v2 API. Is limited to endpoints made available by the API server. The API backend may be configured by advanced users and is not guaranteed to respond as expected. More information can be found here.
+
+```dart
+await AlgoSigner.indexer(
+    ledger: 'TestNet',
+    path: '/v2/assets/150821',
+);
+```
+
+### signTransaction()
+
+Send transaction objects, conforming to the Algorand JS SDK, to AlgoSigner for approval. The Network is determined from the 'genesis-id' property. If approved, the response is an array of signed transaction objects, with the binary blob field base64 encoded to prevent transmission issues.
+
+#### Transaction Requirements
+
+Transactions objects need to be presented with the following structure:
+
+```
+{
+  txn: Base64-encoded string of a transaction binary,
+  signers?: [optional] array of addresses to sign with (defaults to the sender),
+  multisig?: [optional] extra metadata needed for multisig transactions,
+};
+```
+
+For more information, see the [transaction requirements](https://github.com/PureStake/algosigner/blob/develop/docs/dApp-integration.md#transaction-requirements)
+
+#### Request
+
+```dart
+await AlgoSigner.signTransactions(
+    [
+      {
+        'txn': transaction.toBase64(),
+      },
+    ],
+);
+```
+
+#### Example
+The following displays an example on how the algorand-dart SDK can be used to sign transactions with AlgoSigner.
+
+```dart
+await AlgoSigner.connect();
+
+// Fetch the suggested transaction params
+final params = await algorand.getSuggestedTransactionParams();
+
+// Build the transaction
+final transaction = await (PaymentTransactionBuilder()
+    ..sender = address
+    ..note = 'Hi from Flutter'
+    ..amount = Algo.toMicroAlgos(0.1)
+    ..receiver = address
+    ..suggestedParams = params)
+  .build();
+
+final txs = await AlgoSigner.signTransactions(
+    [
+      {
+        'txn': transaction.toBase64(),
+      },
+    ],
+);
+
+final blob = txs[0]['blob'];
+```
+
+### send()
+
+Send a base64 encoded signed transaction blob to AlgoSigner to transmit to the Network.
+
+```dart
+final txId = await AlgoSigner.send(
+    ledger: 'TestNet',
+    transaction: blob,
+);
+
+final tx = await algorand.waitForConfirmation(txId);
 ```
 
 ## Changelog
